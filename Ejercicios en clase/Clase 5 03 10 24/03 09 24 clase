@@ -1,0 +1,16 @@
+UMBRALES
+
+A partir de 2 o mas valores, el valor de enmedio va a decidir si se va para el valor de abajo o el valor de arriba
+Un umbral de 0 a 255 es 127.5, si un valor rebasa de 127.5 pasa a ser 255, si esta debajo de 127.5, es 0
+
+De igual manera si son para mas valores, como para 4 son 3 UMBRALES, para 8 son 7 UMBRALES y 10 son 9 UMBRALES
+
+El punto es obtener el valor de enmedio
+
+FILTRO
+
+Lso filtros pueden decidir que hacaer con un grupo de pixeles
+
+un ejemplo de esto es un filtro gaussiano
+
+Revisar el filtro de mediana y moda

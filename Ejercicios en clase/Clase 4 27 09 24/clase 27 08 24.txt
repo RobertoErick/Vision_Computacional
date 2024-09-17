@@ -1,0 +1,21 @@
+PIA: Arboles y plantas
+
+1._Arboles de naranja en turkia
+2._Enfermedades en hojas de los cerezos
+3._Identificacion de las hojas por medio de la forma
+4._Identificacion de especies de plantas
+5._Reconocimiento de frutas en el Arbol
+6._Cortezas de Arbol
+Mamamos -> 7._Identificaion de especies de plantas (hojas, venas de la hoja, sin redes neuronales, solo mediante fases)
+8._Identificador de semillas/granos de maiz
+9._Arboles alemanes
+10._
+
+buscar un LLM para traducir o entender el documento
+
+Operaciones paralelos y secuenciales
+Cuando todo es paralelo los pixeles cambian al mismo tiempo
+Cuando es secuencial depende de un valor anterior para cambiar
+
+Shifting: cambio de la luz en la imagen
+
