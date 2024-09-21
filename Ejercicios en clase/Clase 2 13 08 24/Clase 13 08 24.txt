@@ -1,0 +1,7 @@
+La clase se dividio en dos temas
+El primero fue encontrar un aparato que salio en el 2010 en adelante que funcione con
+vision computacional, en este caso se escojio el kinect, contó como la actividad 2
+
+El segundo tema fue convertir de RGB a escala de grises, obtener las matrices de R, G y B en 
+CSV y despues convertirlo a blanco y negro para obtener esa misma matriz
+Al final mostrar los resultados de ambas imagenes

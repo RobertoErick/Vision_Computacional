@@ -1,0 +1,6 @@
+Esta clase se dedico a la Actividad 1.1, hecha en word de la investigacion de una empresa que usa 
+Vision computaciona
+
+Empresa: Mobileye - Asistencia de manejo de trafico
+-Inicio de actividades
+-Alcance

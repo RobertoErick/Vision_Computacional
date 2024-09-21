@@ -2,10 +2,10 @@ import cv2
 import numpy as np
 
 # Lee la imagen
-imagen = cv2.imread("Lenna.png")
+imagen = cv2.imread("Imagen a Color.png")
 # Comprueba que la imagen se haya cargado correctamente
 if imagen is None:
-    print("Error: No se pudo cargar la imagen. Asegúrate de que el archivo 'Lenna.png' está en el directorio correcto.")
+    print("Error: No se pudo cargar la imagen. Asegúrate de que el archivo 'Imagen a Color.png' está en el directorio correcto.")
 else:
     # Divide la imagen en sus canales B, G y R ( OpenCV toma el RGB como BGR )
     b, g, r = cv2.split(imagen)
@@ -35,3 +35,6 @@ else:
     cv2.imshow("Imagen a Blanco y negro", gray_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+    # Guardar la imagen en blanco y negro
+    cv2.imwrite("Imagen a Blanco y negro.png", gray_image)
