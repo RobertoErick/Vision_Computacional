@@ -1,58 +1,171 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 
-# Función para cargar la imagen y convertirla a escala de grises
-def cargar_imagen(ruta_imagen):
-    imagen = cv2.imread(ruta_imagen)
-    if imagen is None:
-        raise ValueError("No se pudo cargar la imagen. Verifica la ruta.")
-    imagen_gris = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
-    return imagen, imagen_gris
+# Paso 1: Cargar la imagen
+image = cv2.imread('hojaOriginal.png')  # Reemplaza con la ruta de tu imagen
 
-# Función para binarizar la imagen utilizando un umbral automático (Otsu)
-def binarizar_imagen(imagen_gris):
-    _, imagen_binaria = cv2.threshold(imagen_gris, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    return imagen_binaria
+# Paso 2: Convertir la imagen a escala de grises
+gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-# Función para recortar la imagen eliminando el fondo innecesario
-def recortar_imagen(imagen_binaria):
-    # Encontrar los contornos de la imagen binaria
-    contornos, _ = cv2.findContours(imagen_binaria, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+# Paso 3: Calcular el histograma de la imagen en escala de grises
+histogram, bin_edges = np.histogram(gray_image, bins=240, range=(0, 240))
+
+# Paso 4: Ignorar el fondo (valor 255) en el histograma
+# histogram[255] = 0  # Excluir el fondo blanco
+
+# Paso 5: Encontrar lambda_min (donde el histograma supera los 10 píxeles)
+lambda_min = np.argmax(histogram > 5)  # El primer valor donde hay más de 10 píxeles
+print(lambda_min)
+
+# Paso 6: Encontrar lambda_max (donde el histograma cae por debajo de 10 píxeles)
+lambda_max = len(histogram) - np.argmax(histogram[::-1] > 5) - 1  # El último valor donde hay más de 10 píxeles
+print(lambda_max)
+
+# Paso 7: Binarización automática utilizando los nuevos lambda_min y lambda_max
+binary_image = np.where((gray_image >= lambda_min) & (gray_image <= lambda_max), 1, 0).astype(np.uint8) * 255
+
+# Paso 8: Usamos np.nonzero para encontrar los píxeles que no son fondo (es decir, píxeles diferentes de 0)
+non_zero_pixels = np.nonzero(binary_image)
+
+# Paso 3: Encontrar los límites de recorte (A, C, B, D)
+A = np.min(non_zero_pixels[0])  # Límite superior (primer píxel no cero en filas)
+C = np.max(non_zero_pixels[0])  # Límite inferior (último píxel no cero en filas)
+B = np.min(non_zero_pixels[1])  # Límite izquierdo (primer píxel no cero en columnas)
+D = np.max(non_zero_pixels[1])  # Límite derecho (último píxel no cero en columnas)
+
+print(A, B, C, D)
+
+# Paso 9: Recortar la imagen original utilizando los límites encontrados
+cropped_image = binary_image[A:C+1, B:D+1]
+
+# PASO NUEVO: Crear el histograma de la proyección Top (de B a D)
+top_projection = []
+
+# Recorremos de B a D para la proyección Top
+for col in range(B, D + 1):
+    # Para cada columna, buscamos el primer píxel blanco (255) desde arriba
+    for row in range(cropped_image.shape[0]):
+        if cropped_image[row, col - B] == 255:
+            top_projection.append(row)  # Guardamos la posición del primer píxel blanco
+            break
+    else:
+        # Si no encontramos un píxel blanco, agregamos el valor de la altura total
+        top_projection.append(cropped_image.shape[0])
     
-    if len(contornos) == 0:
-        raise ValueError("No se encontraron contornos en la imagen.")
-    
-    # Obtener el contorno más grande (el de la hoja)
-    contorno_hoja = max(contornos, key=cv2.contourArea)
-    
-    # Obtener el rectángulo delimitador alrededor del contorno de la hoja
-    x, y, ancho, alto = cv2.boundingRect(contorno_hoja)
-    
-    # Recortar la imagen original utilizando el rectángulo delimitador
-    imagen_recortada = imagen_binaria[y:y+alto, x:x+ancho]
-    
-    return imagen_recortada
+# PASO NUEVO: Crear el histograma de la proyección Left (de A a C)
+left_projection = []
 
-# Función principal de preprocesamiento
-def preprocesar_imagen(ruta_imagen):
-    imagen_original, imagen_gris = cargar_imagen(ruta_imagen)
-    imagen_binaria = binarizar_imagen(imagen_gris)
-    imagen_recortada = recortar_imagen(imagen_binaria)
-    
-    # Mostrar resultados (opcional)
-    cv2.imshow('Imagen Original', imagen_original)
-    cv2.imshow('Imagen Binaria', imagen_binaria)
-    cv2.imshow('Imagen Recortada', imagen_recortada)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+# Recorremos de A a C para la proyección Left
+for row in range(A, C + 1):
+    # Para cada fila, buscamos el primer píxel blanco (255) desde la izquierda
+    for col in range(cropped_image.shape[1]):
+        if cropped_image[row - A, col] == 255:
+            left_projection.append(col)  # Guardamos la posición del primer píxel blanco
+            break
+    else:
+        # Si no encontramos un píxel blanco, agregamos el valor del ancho total
+        left_projection.append(cropped_image.shape[1])
 
-    return imagen_recortada
+# PASO NUEVO: Crear el histograma de la proyección Bottom (de B a D)
+bottom_projection = []
 
-# Ruta de la imagen a preprocesar
-ruta_imagen = 'Huizache.jpg'  # Cambia esta ruta por la ubicación de tu imagen
+# Recorremos de B a D para la proyección Bottom
+for col in range(B, D + 1):
+    # Para cada columna, buscamos el último píxel blanco (255) desde arriba hacia abajo
+    for row in range(cropped_image.shape[0] - 1, -1, -1):  # Recorremos desde la parte inferior hacia arriba
+        if cropped_image[row, col - B] == 255:
+            bottom_projection.append(row)  # Guardamos la posición del último píxel blanco
+            break
+    else:
+        # Si no encontramos un píxel blanco, agregamos el valor de 0 (ningún píxel blanco encontrado)
+        bottom_projection.append(0)
 
-# Ejecutar el preprocesamiento
-imagen_final = preprocesar_imagen(ruta_imagen)
+# PASO NUEVO: Crear el histograma de la proyección Bottom (de B a D)
+right_projection = []
 
-# Guardar la imagen preprocesada si lo deseas
-cv2.imwrite('imagen_preprocesada.png', imagen_final)
+# Recorremos de A a C para la proyección Bottom
+for row in range(A, C + 1):
+    # Para cada fila, buscamos el último píxel blanco (255) de derecha a izquierda
+    for col in range(cropped_image.shape[1] - 1, -1, -1):  # Recorremos desde la parte derecha hacia izquierda
+        if cropped_image[row - A, col] == 255:
+            right_projection.append(col)  # Guardamos la posición del último píxel blanco
+            break
+    else:
+        # Si no encontramos un píxel blanco, agregamos el valor de 0 (ningún píxel blanco encontrado)
+        right_projection.append(0)
+
+# Paso 8: Mostrar el histograma que excluye el fondo
+plt.figure()
+plt.title("Histograma de Píxeles (excluyendo fondo blanco)")
+plt.xlabel("Valor de Intensidad")
+plt.ylabel("Número de píxeles")
+plt.xlim([0, 255])  # Solo queremos ver los valores de 0 a 255
+plt.plot(bin_edges[0:-1], histogram)  # Excluyendo el último valor para evitar desbordamientos
+plt.show()
+
+# Mostrar las imágenes
+cv2.imshow('Imagen Original', image)
+cv2.imshow('Imagen en Blanco y Negro', gray_image)
+cv2.imshow('Imagen Binarizada', binary_image)
+cv2.imshow('Imagen Recortada', cropped_image)
+
+"""
+# Graficar la proyección Top
+plt.figure()
+plt.title("Proyección desde Arriba (Top View)")
+plt.xlabel("Columna")
+plt.ylabel("Primera posición del píxel blanco")
+plt.plot(range(B, D + 1), top_projection)
+plt.show()
+
+# Graficar la proyección Left
+plt.figure()
+plt.title("Proyección desde la Izquierda (Left View)")
+plt.xlabel("Fila")
+plt.ylabel("Primera posición del píxel blanco")
+plt.plot(range(A, C + 1), left_projection)
+plt.show()
+
+# Graficar la proyección Bottom
+plt.figure()
+plt.title("Proyección desde Abajo (Bottom View)")
+plt.xlabel("Columna")
+plt.ylabel("Última posición del píxel blanco")
+plt.plot(range(B, D + 1), bottom_projection)
+plt.show()
+
+# Graficar la proyección Right
+plt.figure()
+plt.title("Proyección desde la Derecha (Right View)")
+plt.xlabel("Fila")
+plt.ylabel("Última posición del píxel blanco")
+plt.plot(range(A, C + 1), right_projection)
+plt.show()
+"""
+
+# Subplot 1: Top
+plt.subplot(2, 2, 1)
+plt.plot(top_projection, color='blue')
+plt.title('Top View')
+
+# Subplot 2: Left
+plt.subplot(2, 2, 2)
+plt.plot(left_projection, color='green')
+plt.title('Left View')
+
+# Subplot 3: Bottom
+plt.subplot(2, 2, 3)
+plt.plot(bottom_projection, color='red')
+plt.title('Bottom View')
+
+# Subplot 4: Right
+plt.subplot(2, 2, 4)
+plt.plot(right_projection, color='orange')
+plt.title('Right View')
+
+plt.tight_layout()
+plt.show()
+
+cv2.waitKey(0)
+cv2.destroyAllWindows()
