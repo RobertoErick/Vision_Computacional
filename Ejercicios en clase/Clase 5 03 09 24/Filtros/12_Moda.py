@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Fundion para crea la matriz de dispersion de la imagen original en escala de grises
+# Funcion para crea la matriz de dispersion de la imagen original en escala de grises
 def crear_matriz_dispersion(imagen, promedio):
     nueva_matriz_de_dispersion = imagen.copy()
 
@@ -29,8 +29,8 @@ def histograma_matriz_dispersion(matriz_de_dispersion):
     # Histograma de la matriz de dispersion
     plt.hist(matriz_de_dispersion.ravel(), bins=100, range=[0, 100], color='gray', alpha=0.7)
 
-    plt.suptitle('Histograma de Barras - matriz de dispersion mediana')
-    plt.title('A continuacion, ingresa el valor del porcentaje para ser reemplazadio por la mediana: %i' %moda)
+    plt.suptitle('Histograma de Barras - matriz de dispersion moda')
+    plt.title('A continuacion, ingresa el valor del porcentaje para ser reemplazadio por la moda: %i' %moda)
     plt.xlabel('Valor de Intensidad (0-255)')
     plt.ylabel('Número de Píxeles')
 
@@ -113,7 +113,7 @@ else:
     histograma_matriz_dispersion(matriz_de_dispersion)
 
     # Filtro que se le va a colocar a la imagen (a partir de qué número de la matriz de dispersion va a reemplazar los valores en la imagen)
-    print("Mediana de la imagen (valor por el que va a cambiar los pixeles seleccionados): ", moda)
+    print("Moda de la imagen (valor por el que va a cambiar los pixeles seleccionados): ", moda)
     print("Valor recomendado con las imagenes de prueba: 97")
     filtro = int(input("Introduce el filtro que quieres colocar (0 - 100): "))
 

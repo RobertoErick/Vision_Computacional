@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Fundion para crea la matriz de dispersion de la imagen original en escala de grises
+# Funcion para crea la matriz de dispersion de la imagen original en escala de grises
 def crear_matriz_dispersion(imagen, promedio):
     nueva_matriz_de_dispersion = imagen.copy()
 
