@@ -16,11 +16,11 @@ histogram, bin_edges = np.histogram(gray_image, bins=240, range=(0, 240))
 
 # Paso 5: Encontrar lambda_min (donde el histograma supera los 10 píxeles)
 lambda_min = np.argmax(histogram > 5)  # El primer valor donde hay más de 10 píxeles
-print(lambda_min)
+print("lambda minima: ",lambda_min)
 
 # Paso 6: Encontrar lambda_max (donde el histograma cae por debajo de 10 píxeles)
 lambda_max = len(histogram) - np.argmax(histogram[::-1] > 5) - 1  # El último valor donde hay más de 10 píxeles
-print(lambda_max)
+print("lamba maxima: ",lambda_max)
 
 # Paso 7: Binarización automática utilizando los nuevos lambda_min y lambda_max
 binary_image = np.where((gray_image >= lambda_min) & (gray_image <= lambda_max), 1, 0).astype(np.uint8) * 255
@@ -34,7 +34,7 @@ C = np.max(non_zero_pixels[0])  # Límite inferior (último píxel no cero en fi
 B = np.min(non_zero_pixels[1])  # Límite izquierdo (primer píxel no cero en columnas)
 D = np.max(non_zero_pixels[1])  # Límite derecho (último píxel no cero en columnas)
 
-print(A, B, C, D)
+print("A: ",A,"\nB: ",B,"\nC: ",C,"\nD: ",D)
 
 # Paso 9: Recortar la imagen original utilizando los límites encontrados
 cropped_image = binary_image[A:C+1, B:D+1]
@@ -165,6 +165,18 @@ plt.plot(right_projection, color='orange')
 plt.title('Right View')
 
 plt.tight_layout()
+plt.show()
+
+# Unir los perfiles en el orden: Arriba -> Izquierda -> Abajo -> Derecha
+perfil_continuo = np.concatenate((top_projection, right_projection, bottom_projection, left_projection))
+    
+# Crear un gráfico de línea del perfil AVP continuo
+plt.figure(figsize=(10, 4))
+plt.plot(perfil_continuo, color='blue', lw=1)
+plt.title("Perfil AVP Continuo de la Hoja")
+plt.xlabel("Puntos del contorno")
+plt.ylabel("Distancia al borde")
+plt.grid(True)
 plt.show()
 
 cv2.waitKey(0)
