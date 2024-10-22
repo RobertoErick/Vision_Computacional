@@ -2,28 +2,34 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Paso 1: Cargar la imagen
+# Paso 1: Cargar la imagen y verificar si se cargó correctamente
 image = cv2.imread('hojaOriginal.png')  # Reemplaza con la ruta de tu imagen
+if image is None:
+    raise FileNotFoundError("La imagen no se pudo cargar. Verifica la ruta.")
 
 # Paso 2: Convertir la imagen a escala de grises
 gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-# Paso 3: Calcular el histograma de la imagen en escala de grises
-histogram, bin_edges = np.histogram(gray_image, bins=240, range=(0, 240))
+# Paso 3: Calcular el histograma de la imagen en escala de grises (hasta 255 para incluir fondo)
+histogram, bin_edges = np.histogram(gray_image, bins=256, range=(0, 255))
 
-# Paso 4: Ignorar el fondo (valor 255) en el histograma
-# histogram[255] = 0  # Excluir el fondo blanco
+# Paso 4: Encontrar el valor dominante del fondo (el valor con más píxeles)
+fondo_valor = np.argmax(histogram)
+print("Valor dominante del fondo: ", fondo_valor)
 
-# Paso 5: Encontrar lambda_min (donde el histograma supera los 10 píxeles)
-lambda_min = np.argmax(histogram > 5)  # El primer valor donde hay más de 10 píxeles
-print("lambda minima: ",lambda_min)
+# Paso 5: Definir un rango para el fondo alrededor del valor dominante
+# (asumiendo que el fondo tiene una variación leve de intensidad)
+rango_fondo = 60  # Ajustar según la variabilidad del fondo
 
-# Paso 6: Encontrar lambda_max (donde el histograma cae por debajo de 10 píxeles)
-lambda_max = len(histogram) - np.argmax(histogram[::-1] > 5) - 1  # El último valor donde hay más de 10 píxeles
-print("lamba maxima: ",lambda_max)
+lambda_min_fondo = max(fondo_valor - rango_fondo, 0)
+lambda_max_fondo = min(fondo_valor + rango_fondo, 255)
 
-# Paso 7: Binarización automática utilizando los nuevos lambda_min y lambda_max
-binary_image = np.where((gray_image >= lambda_min) & (gray_image <= lambda_max), 1, 0).astype(np.uint8) * 255
+print("lambda mínima (fondo): ", lambda_min_fondo)
+print("lambda máxima (fondo): ", lambda_max_fondo)
+
+# Paso 6: Binarización excluyendo el fondo
+binary_image = np.where(
+    (gray_image < lambda_min_fondo) | (gray_image > lambda_max_fondo), 1, 0).astype(np.uint8) * 255
 
 # Paso 8: Usamos np.nonzero para encontrar los píxeles que no son fondo (es decir, píxeles diferentes de 0)
 non_zero_pixels = np.nonzero(binary_image)
