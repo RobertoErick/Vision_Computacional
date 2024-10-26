@@ -1,0 +1,11 @@
+OBTENER LAS LINEAS RECTAS DE UNA IMAGEN DEPENDIENDO SUS BORDES DE VECINDARIOS
+
+Método RANSAC
+Transformada de Hough
+
+para calcular los bordes se usan los votos para saber cuales son los que tiene mas votados para ser conecciones o líneas rectas (líneas rectas
+pueden ser tanto en vertical, horizontal y diagonal)
+
+Vamos a tener dos resultados
+uno de linea rectas que va a ir a esquinas
+uno que no sea linea recta que va a ir a círculos y elipses

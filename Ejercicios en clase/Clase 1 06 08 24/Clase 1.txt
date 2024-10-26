@@ -1,0 +1,26 @@
+Copmponentes del proceso de formación de imágenes
+perspectiva de la proyección
+Dispersión de la luz
+
+Lineas y planos
+
+Luz
+
+Vamos a trabajarlo en escala de grises
+
+La formula de los colores en al escala de grises va a ser en en 1/3 de Rojo, Verde y Amarillo, estos va dar 
+
+Cuando asignen el pia se debe revisar los detalles pq lo va a preguntar al momento de entregarlo
+
+
+
+Como cargar una imagen y como transformarla en un escala de grises en OpenCV
+
+Que es lo que debemos mostrar
+Codigo
+Imagen original
+Imagen de salida
+Matriz original
+Matriz de salida
+
+obtener las matrices en .csv no en la terminal por lo desordenadp

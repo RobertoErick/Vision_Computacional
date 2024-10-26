@@ -1,0 +1,7 @@
+Elipses
+Método de Tsuji y Matsumoto
+
+(de la formula)
+"O" es el centro y "P" y "Q" son los focos
+
+Método de Cuerda Tangente
