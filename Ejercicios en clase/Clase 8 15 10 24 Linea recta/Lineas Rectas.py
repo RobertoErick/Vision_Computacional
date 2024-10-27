@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.linear_model import RANSACRegressor
 
 # Función para aplicar RANSAC en múltiples iteraciones
-def detectar_varias_lineas_ransac(puntos_X, puntos_Y, min_puntos=50, max_iteraciones=10):
+def detectar_varias_lineas_ransac(puntos_X, puntos_Y, min_puntos=5, max_iteraciones=50):
     lineas_ransac = []
     iteracion = 0
 
@@ -90,10 +90,6 @@ else:
     # Crear imagen binaria para los bordes
     bordes_imagen = np.zeros_like(imagen)
 
-    cv2.imshow('Vecindarios', output_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
     # Marcar los píxeles de borde en la imagen binaria
     for borde in bordes_vecindarios:
         for (r, c) in borde:
@@ -104,48 +100,60 @@ else:
     # minLineLength: La minima cantidad de pixeles para poder considerarse linea recta
     # masLineGap: maxima separacion permitida entre dos puntos de una linea
     lineas = cv2.HoughLinesP(bordes_imagen, rho=1, theta=np.pi / 180, threshold=50, minLineLength=2, maxLineGap=10)
+
+    solo_lineas = np.zeros_like(bordes_imagen)
+    bordes_restantes = np.copy(bordes_imagen)
+
     """
     if lineas is not None:
     # Preparar las listas de puntos X e Y
         puntos_X = []
         puntos_Y = []
 
-    for linea in lineas:
-        for x1, y1, x2, y2 in linea:
-            puntos_X.append([x1])  # x como predictor
-            puntos_X.append([x2])
-            puntos_Y.append(y1)    # y como valor predicho
-            puntos_Y.append(y2)
+        for linea in lineas:
+            for x1, y1, x2, y2 in linea:
+                puntos_X.append([x1])  # x como predictor
+                puntos_X.append([x2])
+                puntos_Y.append(y1)    # y como valor predicho
+                puntos_Y.append(y2)
 
-    # Convertir las listas a matrices numpy
-    puntos_X = np.array(puntos_X)
-    puntos_Y = np.array(puntos_Y)
+        # Convertir las listas a matrices numpy
+        puntos_X = np.array(puntos_X)
+        puntos_Y = np.array(puntos_Y)
 
-    # Detectar varias líneas con RANSAC
-    lineas_detectadas = detectar_varias_lineas_ransac(puntos_X, puntos_Y)
+        # Detectar varias líneas con RANSAC
+        lineas_detectadas = detectar_varias_lineas_ransac(puntos_X, puntos_Y)
 
-    # Dibujar las líneas detectadas en la imagen
-    for linea in lineas_detectadas:
-        puntos_inliers_X, puntos_inliers_Y = linea
-        
-        # Encontrar los puntos extremos de los inliers
-        if len(puntos_inliers_X) > 1:  # Asegurar que haya al menos dos puntos para formar una línea
-            x_start, x_end = int(puntos_inliers_X.min()), int(puntos_inliers_X.max())
+        # Dibujar las líneas detectadas en la imagen
+        for linea in lineas_detectadas:
+            puntos_inliers_X, puntos_inliers_Y = linea
             
-            # Obtener los valores de y correspondientes a los puntos extremos en x
-            y_start = int(puntos_inliers_Y[puntos_inliers_X.argmin()])
-            y_end = int(puntos_inliers_Y[puntos_inliers_X.argmax()])
-            
-            # Dibujar la línea entre los puntos extremos
-            cv2.line(imagen_a_color, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
+            # Encontrar los puntos extremos de los inliers
+            if len(puntos_inliers_X) > 1:  # Asegurar que haya al menos dos puntos para formar una línea
+                x_start, x_end = int(puntos_inliers_X.min()), int(puntos_inliers_X.max())
+                
+                # Obtener los valores de y correspondientes a los puntos extremos en x
+                y_start = int(puntos_inliers_Y[puntos_inliers_X.argmin()])
+                y_end = int(puntos_inliers_Y[puntos_inliers_X.argmax()])
+                
+                # Dibujar la línea entre los puntos extremos
+                cv2.line(imagen_a_color, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
     """
     if lineas is not None:
         for linea in lineas:
             for x1, y1, x2, y2 in linea:
                 cv2.line(imagen_a_color, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Dibuja cada línea con color verde
+                cv2.line(solo_lineas, (x1, y1), (x2, y2), (255), 2)  # Dibuja cada línea con color verde
+                cv2.line(bordes_restantes, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Quita las lineas rectas
+
+    np.savetxt('Lineas rectas.csv', solo_lineas, delimiter=',', fmt='%d')
+    np.savetxt('Bordes restantes.csv', bordes_restantes, delimiter=',', fmt='%d')
 
     # Mostrar la imagen con las líneas detectadas
+    cv2.imshow('Vecindarios', output_image)
     cv2.imshow("Bordes de la imagen", bordes_imagen)
-    cv2.imshow('Líneas detectadas con Hough', imagen_a_color)
+    cv2.imshow('Lineas rectas sobrepuestas', imagen_a_color)
+    cv2.imshow('Solo lineas rectas', solo_lineas)
+    cv2.imshow("Bordes restantes de la imagen", bordes_restantes)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
