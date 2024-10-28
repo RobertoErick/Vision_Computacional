@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Paso 1: Cargar la imagen y verificar si se cargó correctamente
-image = cv2.imread('hojaOriginal.png')  # Reemplaza con la ruta de tu imagen
+image = cv2.imread('imagen fondo rosa 2.png')  # Reemplaza con la ruta de tu imagen
 if image is None:
     raise FileNotFoundError("La imagen no se pudo cargar. Verifica la ruta.")
 
