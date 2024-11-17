@@ -1,0 +1,17 @@
+Encontrar las esquinas de unas líneas rectas
+
+Pixel 1: (a, b, m1)
+pixel 2: (a+1, b+1, m2)
+
+M = [ m1
+      m2
+      m3
+      ...
+      my ]
+
+li = [ p1 , … , pn ]
+
+
+Poligonos
+Encontrar las conecciones de diferentes lineas rectas entre si para ver cual linea recta comeinza donde termina esta, asi mismo verificar una a una para terminar cerrando el poligono
+

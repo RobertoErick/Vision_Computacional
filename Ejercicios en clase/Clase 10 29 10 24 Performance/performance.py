@@ -69,7 +69,7 @@ def detectar_vecindarios(image, rango=50):
     return vecindarios, bordes_vecindarios
 
 # Cargar imagen en escala de grises
-imagen_a_color = cv2.imread('imagen recortada.png')
+imagen_a_color = cv2.imread('imagen 3.png')
 if imagen_a_color is None:
     print("Error: No se pudo cargar la imagen.")
 else:
@@ -144,7 +144,7 @@ else:
             for x1, y1, x2, y2 in linea:
                 cv2.line(imagen_a_color, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Dibuja cada línea con color verde
                 cv2.line(solo_lineas, (x1, y1), (x2, y2), (255), 2)  # Dibuja cada línea con color verde
-                cv2.line(bordes_restantes, (x1, y1), (x2, y2), (0), 2) # Quita las lineas rectas
+                cv2.line(bordes_restantes, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Quita las lineas rectas
 
     np.savetxt('Lineas rectas.csv', solo_lineas, delimiter=',', fmt='%d')
     np.savetxt('Bordes restantes.csv', bordes_restantes, delimiter=',', fmt='%d')
@@ -157,3 +157,9 @@ else:
     cv2.imshow("Bordes restantes de la imagen", bordes_restantes)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+    cv2.imwrite('Vecindarios.png', output_image)
+    cv2.imwrite("Bordes de la imagen.png", bordes_imagen)
+    cv2.imwrite('Lineas rectas sobrepuestas.png', imagen_a_color)
+    cv2.imwrite('Solo lineas rectas.png', solo_lineas)
+    cv2.imwrite("Bordes restantes de la imagen.png", bordes_restantes)

@@ -1,0 +1,18 @@
+Como obtener agujeros (es diferente a el laboratorio)
+dividir cualquiera de las identidades adyacentes y si es mayor o igual que dos o menos o igual que un medio es un agujero
+
+
+Descriptor relacionales: patrones que se repiten en la imagen (estructura que se esta repitiendo), un ejemplo es un patron de varios rectángulos, su descriptor relacional es una linea recta larga perpendicular a una linea corta, no importa que angulo este, simplemente es su forma mas básica (siempre es su forma mas básica para hacer que sea mas eficiente, elegir la forma mas sencilla posible)
+
+Descriptores relacionales y patrones
+
+
+Textura: diferentes vecindarios con intensidad similar en cada vecindario, son antiagujeros, ya que esta imagen la divide bordes, sin embargo cada borde forma parte del mismo objeto por lo cual todos los vecindarios tiene un rango de escala de grises similar
+
+No existe un patron relacional para definir una imagen completa (como un gato) se tiene que definir por regiones
+
+investigar metodos para detectar patrones y texturas sin involucrar machine learning 
+
+
+La primera actividad es subir la imagen de un personaje favorito
+la segunda es dejarlo irreconocible con un solo operador una sola vez
