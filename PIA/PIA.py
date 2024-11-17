@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Paso 1: Cargar la imagen y verificar si se cargó correctamente
-image = cv2.imread('imagen fondo rosa 2.png')  # Reemplaza con la ruta de tu imagen
+image = cv2.imread('hoja_rotada.jpg')  # Reemplaza con la ruta de tu imagen
 if image is None:
     raise FileNotFoundError("La imagen no se pudo cargar. Verifica la ruta.")
 
@@ -42,8 +42,42 @@ D = np.max(non_zero_pixels[1])  # Límite derecho (último píxel no cero en col
 
 print("A: ",A,"\nB: ",B,"\nC: ",C,"\nD: ",D)
 
+# Función para verificar si B y D están alineados y A y C están alineados
+def verificar_alineacion(binary_img):
+    # Recalcular los límites A, B, C, D
+    non_zero_pixels = np.nonzero(binary_img)
+    A = np.min(non_zero_pixels[0])
+    C = np.max(non_zero_pixels[0])
+    B = np.min(non_zero_pixels[1])
+    D = np.max(non_zero_pixels[1])
+    # Verificar si B y D están en la misma fila y A y C en la misma columna
+    return A == C and B == D
+
+# Función para rotar la imagen
+def rotar_imagen(img, angulo):
+    M = cv2.getRotationMatrix2D((img.shape[1] // 2, img.shape[0] // 2), angulo, 1)
+    return cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
+
+# Probar rotaciones en ambos sentidos
+angulo_min = None
+esfuerzo_min = None
+imagen_rotada_final = None
+
+for angulo in range(0, 180, 5):  # Iterar en pasos de 5 grados hasta 180
+    for direccion in [1, -1]:  # Probar rotación en sentido positivo y negativo
+        angulo_actual = angulo * direccion
+        img_rotada = rotar_imagen(binary_image, angulo_actual)
+        
+        # Verificar alineación y guardar si requiere menos esfuerzo
+        if verificar_alineacion(img_rotada):
+            esfuerzo = abs(angulo_actual)
+            if esfuerzo_min is None or esfuerzo < esfuerzo_min:
+                esfuerzo_min = esfuerzo
+                angulo_min = angulo_actual
+                imagen_rotada_final = img_rotada.copy()
+
 # Paso 9: Recortar la imagen original utilizando los límites encontrados
-cropped_image = binary_image[A:C+1, B:D+1]
+cropped_image = imagen_rotada_final[A:C+1, B:D+1]
 
 # PASO NUEVO: Crear el histograma de la proyección Top (de B a D)
 top_projection = []
@@ -115,40 +149,6 @@ cv2.imshow('Imagen Original', image)
 cv2.imshow('Imagen en Blanco y Negro', gray_image)
 cv2.imshow('Imagen Binarizada', binary_image)
 cv2.imshow('Imagen Recortada', cropped_image)
-
-"""
-# Graficar la proyección Top
-plt.figure()
-plt.title("Proyección desde Arriba (Top View)")
-plt.xlabel("Columna")
-plt.ylabel("Primera posición del píxel blanco")
-plt.plot(range(B, D + 1), top_projection)
-plt.show()
-
-# Graficar la proyección Left
-plt.figure()
-plt.title("Proyección desde la Izquierda (Left View)")
-plt.xlabel("Fila")
-plt.ylabel("Primera posición del píxel blanco")
-plt.plot(range(A, C + 1), left_projection)
-plt.show()
-
-# Graficar la proyección Bottom
-plt.figure()
-plt.title("Proyección desde Abajo (Bottom View)")
-plt.xlabel("Columna")
-plt.ylabel("Última posición del píxel blanco")
-plt.plot(range(B, D + 1), bottom_projection)
-plt.show()
-
-# Graficar la proyección Right
-plt.figure()
-plt.title("Proyección desde la Derecha (Right View)")
-plt.xlabel("Fila")
-plt.ylabel("Última posición del píxel blanco")
-plt.plot(range(A, C + 1), right_projection)
-plt.show()
-"""
 
 # Subplot 1: Top
 plt.subplot(2, 2, 1)
