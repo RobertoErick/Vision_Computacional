@@ -1,25 +1,26 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
-# Paso 1: Cargar la imagen y verificar si se cargó correctamente
-image = cv2.imread('hoja_rotada.jpg')  # Reemplaza con la ruta de tu imagen
+# Cargar la imagen y verificar si se cargó correctamente
+image = cv2.imread('hoja_rotada2.jpg')  # Reemplaza con la ruta de tu imagen
 if image is None:
     raise FileNotFoundError("La imagen no se pudo cargar. Verifica la ruta.")
 
-# Paso 2: Convertir la imagen a escala de grises
+# Convertir la imagen a escala de grises
 gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-# Paso 3: Calcular el histograma de la imagen en escala de grises (hasta 255 para incluir fondo)
+# Calcular el histograma de la imagen en escala de grises
 histogram, bin_edges = np.histogram(gray_image, bins=256, range=(0, 255))
 
-# Paso 4: Encontrar el valor dominante del fondo (el valor con más píxeles)
+# Encontrar el valor dominante del fondo (el valor con más píxeles)
 fondo_valor = np.argmax(histogram)
 print("Valor dominante del fondo: ", fondo_valor)
 
-# Paso 5: Definir un rango para el fondo alrededor del valor dominante
+# Definir un rango para el fondo alrededor del valor dominante
 # (asumiendo que el fondo tiene una variación leve de intensidad)
-rango_fondo = 60  # Ajustar según la variabilidad del fondo
+rango_fondo = 60  # Si el fondo es constante (segun el Dataset lo es) no habra problema con este valor
 
 lambda_min_fondo = max(fondo_valor - rango_fondo, 0)
 lambda_max_fondo = min(fondo_valor + rango_fondo, 255)
@@ -27,59 +28,72 @@ lambda_max_fondo = min(fondo_valor + rango_fondo, 255)
 print("lambda mínima (fondo): ", lambda_min_fondo)
 print("lambda máxima (fondo): ", lambda_max_fondo)
 
-# Paso 6: Binarización excluyendo el fondo
+# Binarización excluyendo el fondo
 binary_image = np.where(
     (gray_image < lambda_min_fondo) | (gray_image > lambda_max_fondo), 1, 0).astype(np.uint8) * 255
 
-# Paso 8: Usamos np.nonzero para encontrar los píxeles que no son fondo (es decir, píxeles diferentes de 0)
+# Usamos np.nonzero para encontrar los píxeles que no son fondo (es decir, píxeles diferentes de 0)
 non_zero_pixels = np.nonzero(binary_image)
 
-# Paso 3: Encontrar los límites de recorte (A, C, B, D)
-A = np.min(non_zero_pixels[0])  # Límite superior (primer píxel no cero en filas)
-C = np.max(non_zero_pixels[0])  # Límite inferior (último píxel no cero en filas)
-B = np.min(non_zero_pixels[1])  # Límite izquierdo (primer píxel no cero en columnas)
-D = np.max(non_zero_pixels[1])  # Límite derecho (último píxel no cero en columnas)
+# Funcion para obtener los puntos extremos de la hoja (Puntos A, B C y D)
+# Se obtienen 2 veces, antes de ser rotados y despues de ser rotado
+def extremos(binary_image):
+    non_zero_pixels = np.nonzero(binary_image)
 
-print("A: ",A,"\nB: ",B,"\nC: ",C,"\nD: ",D)
+    # Encontrar los límites de recorte (A, C, B, D)
+    A = np.min(non_zero_pixels[0])  # Límite superior (primer píxel no cero en filas)
+    C = np.max(non_zero_pixels[0])  # Límite inferior (último píxel no cero en filas)
+    B = np.min(non_zero_pixels[1])  # Límite izquierdo (primer píxel no cero en columnas)
+    D = np.max(non_zero_pixels[1])  # Límite derecho (último píxel no cero en columnas)
 
-# Función para verificar si B y D están alineados y A y C están alineados
-def verificar_alineacion(binary_img):
-    # Recalcular los límites A, B, C, D
-    non_zero_pixels = np.nonzero(binary_img)
-    A = np.min(non_zero_pixels[0])
-    C = np.max(non_zero_pixels[0])
-    B = np.min(non_zero_pixels[1])
-    D = np.max(non_zero_pixels[1])
-    # Verificar si B y D están en la misma fila y A y C en la misma columna
-    return A == C and B == D
+    print("A: ",A,"\nB: ",B,"\nC: ",C,"\nD: ",D)
 
-# Función para rotar la imagen
-def rotar_imagen(img, angulo):
-    M = cv2.getRotationMatrix2D((img.shape[1] // 2, img.shape[0] // 2), angulo, 1)
-    return cv2.warpAffine(img, M, (img.shape[1], img.shape[0]))
+    return A, B, C, D
 
-# Probar rotaciones en ambos sentidos
-angulo_min = None
-esfuerzo_min = None
-imagen_rotada_final = None
+# Obtenemos los datos de los extremos antes de ser rotados
+A, B, C, D = extremos(binary_image)
 
-for angulo in range(0, 180, 5):  # Iterar en pasos de 5 grados hasta 180
-    for direccion in [1, -1]:  # Probar rotación en sentido positivo y negativo
-        angulo_actual = angulo * direccion
-        img_rotada = rotar_imagen(binary_image, angulo_actual)
-        
-        # Verificar alineación y guardar si requiere menos esfuerzo
-        if verificar_alineacion(img_rotada):
-            esfuerzo = abs(angulo_actual)
-            if esfuerzo_min is None or esfuerzo < esfuerzo_min:
-                esfuerzo_min = esfuerzo
-                angulo_min = angulo_actual
-                imagen_rotada_final = img_rotada.copy()
+# Se obtiene la coordenada de la fila en B y D
+y_B = np.min(non_zero_pixels[0][non_zero_pixels[1] == B])
+y_D = np.min(non_zero_pixels[0][non_zero_pixels[1] == D])
 
-# Paso 9: Recortar la imagen original utilizando los límites encontrados
-cropped_image = imagen_rotada_final[A:C+1, B:D+1]
+# Calcular el ángulo necesario para alinear B y D
+delta_y = y_D - y_B
+delta_x = D - B
+angle = math.degrees(math.atan2(delta_y, delta_x))
 
-# PASO NUEVO: Crear el histograma de la proyección Top (de B a D)
+print(f"Ángulo calculado para alinear B y D: {angle:.2f} grados")
+
+# Rotar la imagen usando el ángulo calculado
+center = (binary_image.shape[1] // 2, binary_image.shape[0] // 2)
+M = cv2.getRotationMatrix2D(center, angle, 1.0)
+binary_image_rotated = cv2.warpAffine(binary_image, M, (binary_image.shape[1], binary_image.shape[0]))
+
+# Dibujar puntos B y D antes y después de la rotación
+image_with_points = cv2.cvtColor(binary_image, cv2.COLOR_GRAY2BGR)
+rotated_with_points = cv2.cvtColor(binary_image_rotated, cv2.COLOR_GRAY2BGR)
+
+cv2.circle(image_with_points, (B, y_B), 5, (0, 0, 255), -1)  # Punto B antes de rotación
+cv2.circle(image_with_points, (D, y_D), 5, (255, 0, 0), -1)  # Punto D antes de rotación
+
+# Transformar coordenadas después de la rotación
+B_rot = np.dot(M, np.array([B, y_B, 1]))
+D_rot = np.dot(M, np.array([D, y_D, 1]))
+
+cv2.circle(rotated_with_points, (int(B_rot[0]), int(B_rot[1])), 5, (0, 0, 255), -1)  # Punto B después de rotación
+cv2.circle(rotated_with_points, (int(D_rot[0]), int(D_rot[1])), 5, (255, 0, 0), -1)  # Punto D después de rotación
+
+# Mostrar imágenes
+cv2.imshow('Imagen Original con Puntos', image_with_points)
+cv2.imshow('Imagen Rotada con Puntos', rotated_with_points)
+
+# Se vuelve a obtener los extremos de la imagen para su recorte
+A, B, C, D = extremos(binary_image_rotated)
+
+# Recortar la imagen original utilizando los límites encontrados
+cropped_image = binary_image_rotated[A:C+1, B:D+1]
+
+# Crear el histograma de la proyección Top (de B a D)
 top_projection = []
 
 # Recorremos de B a D para la proyección Top
@@ -147,7 +161,7 @@ plt.show()
 # Mostrar las imágenes
 cv2.imshow('Imagen Original', image)
 cv2.imshow('Imagen en Blanco y Negro', gray_image)
-cv2.imshow('Imagen Binarizada', binary_image)
+cv2.imshow('Imagen Binarizada', binary_image_rotated)
 cv2.imshow('Imagen Recortada', cropped_image)
 
 # Subplot 1: Top
