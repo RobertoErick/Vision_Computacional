@@ -3,37 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 
-# Cargar la imagen y verificar si se cargó correctamente
-image = cv2.imread('hoja_rotada2.jpg')  # Reemplaza con la ruta de tu imagen
-if image is None:
-    raise FileNotFoundError("La imagen no se pudo cargar. Verifica la ruta.")
-
-# Convertir la imagen a escala de grises
-gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-# Calcular el histograma de la imagen en escala de grises
-histogram, bin_edges = np.histogram(gray_image, bins=256, range=(0, 255))
-
-# Encontrar el valor dominante del fondo (el valor con más píxeles)
-fondo_valor = np.argmax(histogram)
-print("Valor dominante del fondo: ", fondo_valor)
-
-# Definir un rango para el fondo alrededor del valor dominante
-# (asumiendo que el fondo tiene una variación leve de intensidad)
-rango_fondo = 60  # Si el fondo es constante (segun el Dataset lo es) no habra problema con este valor
-
-lambda_min_fondo = max(fondo_valor - rango_fondo, 0)
-lambda_max_fondo = min(fondo_valor + rango_fondo, 255)
-
-print("lambda mínima (fondo): ", lambda_min_fondo)
-print("lambda máxima (fondo): ", lambda_max_fondo)
-
-# Binarización excluyendo el fondo
-binary_image = np.where(
-    (gray_image < lambda_min_fondo) | (gray_image > lambda_max_fondo), 1, 0).astype(np.uint8) * 255
-
-# Usamos np.nonzero para encontrar los píxeles que no son fondo (es decir, píxeles diferentes de 0)
-non_zero_pixels = np.nonzero(binary_image)
+# -------------------------------------Seccion Recortes de imagen------------------------------------------- #
 
 # Funcion para obtener los puntos extremos de la hoja (Puntos A, B C y D)
 # Se obtienen 2 veces, antes de ser rotados y despues de ser rotado
@@ -49,6 +19,177 @@ def extremos(binary_image):
     print("A: ",A,"\nB: ",B,"\nC: ",C,"\nD: ",D)
 
     return A, B, C, D
+
+# ---------------------------------------------------------------------------------------------------------- #
+# ----------------------------------------------Seccion DCT------------------------------------------------- #
+
+# Calcula el coeficiente DCTk para un perfil dado
+def calcular_dctk(perfil, k):
+    # perfil: perfil AVP antes de ser procesado
+    # k: indice de coeficiente DCT a calcular
+
+    N = len(perfil)  # Longitud del perfil
+    dctk = 0.0  # Inicializar el coeficiente
+
+    for n in range(N):
+        dctk += perfil[n] * np.cos((np.pi / N) * (n + 0.5) * k)
+
+    return dctk
+
+# Calcula la IDCTi para reconstruir un valor a partir de los coeficientes DCT.
+def calcular_idcti(dct_coeffs, i):
+    # dct_coeffs: Coeficientes DCT
+    # i: El índice del valor reconstruido.
+
+    N = len(dct_coeffs)  # Longitud de los coeficientes DCT
+    idcti = dct_coeffs[0] / 2  # Primer término (DCT_0 / 2)
+
+    for k in range(1, N):  # Desde DCT_1 hasta DCT_{N-1}
+        idcti += dct_coeffs[k] * np.cos((np.pi / N) * k * (i + 0.5))
+
+    return idcti / N  # Dividir por N para obtener el valor final
+
+# Reconstruye el perfil completo usando la IDCT.
+def reconstruir_perfil_completo(dct_coeffs):
+    # dct_coeffs: Los coeficientes DCT.
+
+    N = len(dct_coeffs)  # Longitud del perfil (número de coeficientes DCT)
+    perfil_reconstruido = []
+
+    for i in range(N):  # Iterar sobre todos los índices
+        idcti = calcular_idcti(dct_coeffs, i)  # Calcular IDCTi para el índice actual
+        perfil_reconstruido.append(idcti)  # Agregar el valor reconstruido
+
+    return perfil_reconstruido
+
+# Calcula el error EDCT entre el perfil original y el reconstruido.
+def calcular_edct(perfil_original, perfil_reconstruido):
+    # perfil_original: El perfil original.
+    # perfil_reconstruido: El perfil reconstruido.
+
+    N = len(perfil_original)  # Longitud del perfil
+    error_cuadrado = np.sum((np.array(perfil_original) - np.array(perfil_reconstruido))**2)
+    edct = np.sqrt(error_cuadrado / N)
+    return edct
+
+# ---------------------------------------------------------------------------------------------------------- #
+# ---------------------------------------Seccion AVP-DCT Matching------------------------------------------- #
+
+# Normaliza la longitud de la curva AVP-DCT, esto para que tenga la misma longitud todos los perfiles (dataset y la imagen a comparar)
+def normalizar_longitud(perfil, longitud_deseada=1500):
+    # perfil: Perfil AVP-DCT Orginal de la imagen a comparar
+    # longitud_deseada: Longitud que va a tener el perfil normalizado 
+
+    x_original = np.linspace(0, 1, len(perfil))
+    x_deseado = np.linspace(0, 1, longitud_deseada)
+    perfil_normalizado = np.interp(x_deseado, x_original, perfil)
+
+    return perfil_normalizado
+
+# Distancia entre un perfil AVP-DCT de la imagen a comparar y el dataset
+def calcular_distancia_euclidiana(perfil1, perfil2):
+    return np.sqrt(np.sum((np.array(perfil1) - np.array(perfil2))**2))
+
+# Muestra un diagrama de dispersión para las distancias más cercanas.
+def mostrar_diagrama_dispersion(distancias, k, nombre_hoja_prediccion="Hoja a Predecir"):
+    # distancias: Lista de tuplas (distancia, planta) ordenadas de menor a mayor
+    # k: Número de vecinos más cercanos a mostrar.
+
+    # Seleccionar los k vecinos más cercanos
+    mejores_k = distancias[:k]
+    
+    # Separar las distancias, índices, y etiquetas de plantas
+    indices = list(range(1, k + 1))  # Índices del 1 al k
+    distancias_valores = [item[0] for item in mejores_k]
+    plantas = [item[1] for item in mejores_k]
+
+    # Crear el diagrama de dispersión
+    plt.figure(figsize=(10, 5))
+    scatter = plt.scatter(indices, distancias_valores, c=range(len(plantas)), cmap='viridis', s=100, edgecolor='k', alpha=0.7)
+    
+    # Agregar un punto especial para la "hoja a predecir"
+    plt.scatter(0, 0, color='red', s=150, edgecolor='black', label=nombre_hoja_prediccion)  # Punto rojo para destacar
+
+    # Configuración de ejes y leyendas
+    plt.xlabel("Índice del Vecino")
+    plt.ylabel("Distancia Euclidiana")
+    plt.title(f"Diagrama de Dispersión: Distancias de los {k} Vecinos Más Cercanos")
+    plt.colorbar(scatter, label="Etiqueta de Planta (Indexado)")
+    plt.legend(loc="upper left")
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+
+    # Etiquetas de las plantas sobre los puntos
+    for i, planta in enumerate(plantas):
+        plt.text(indices[i], distancias_valores[i] + 0.01, planta, fontsize=9, ha='center')
+
+    plt.show()
+
+# Realiza el AVP Matching utilizando k-NN y genera un diagrama de dispersión.
+def avp_matching(perfil_reconstruido, resultados_path, k=3, longitud_deseada=1500):
+    perfil_nuevo_normalizado = normalizar_longitud(perfil_reconstruido, longitud_deseada)
+
+    # Cargar los resultados almacenados
+    resultados = np.load(resultados_path, allow_pickle=True).item()
+
+    distancias = []
+    for planta, perfiles in resultados.items():
+        for perfil_guardado in perfiles:
+            perfil_guardado_normalizado = normalizar_longitud(perfil_guardado["perfil_avp"], longitud_deseada)
+            distancia = calcular_distancia_euclidiana(perfil_nuevo_normalizado, perfil_guardado_normalizado)
+            distancias.append((distancia, planta))
+
+    distancias.sort(key=lambda x: x[0])
+    vecinos = distancias[:k]
+
+    # Mostrar diagrama de dispersión con "hoja a predecir"
+    mostrar_diagrama_dispersion(distancias, k, nombre_hoja_prediccion="Hoja a Predecir")
+
+    conteo = {}
+    for _, planta in vecinos:
+        conteo[planta] = conteo.get(planta, 0) + 1
+
+    planta_probable = max(conteo, key=conteo.get)
+    return planta_probable
+
+# ---------------------------------------------------------------------------------------------------------- #
+# ----------------------------------------Seccion Principal------------------------------------------------- #
+
+# Cargar dataset anteriormente procesado y verificar contenido
+resultados_path = 'resultados_avp_dct.npy'  # Archivo de resultados
+if not resultados_path:
+    raise ValueError("El diccionario está vacío. Verifica la ruta")
+
+# Cargar la imagen y verificar si se cargó correctamente
+image = cv2.imread('hoja_rotada2.jpg')  # Imagen a predecir
+if image is None:
+    raise FileNotFoundError("La imagen no se pudo cargar. Verifica la ruta.")
+
+# Convertir la imagen a escala de grises
+gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+# Calcular el histograma de la imagen en escala de grises
+histogram, bin_edges = np.histogram(gray_image, bins=256, range=(0, 255))
+
+# Encontrar el valor dominante del fondo (el valor con más píxeles)
+fondo_valor = np.argmax(histogram)
+print("Valor dominante del fondo: ", fondo_valor)
+
+# Definir un rango para calcular el fondo a travez de un pivote (como vecindarios) selecciona el fondo en el histograma y denota la hoja
+rango_fondo = 60  # Si el fondo es constante (segun el Dataset lo es) no habra problema con este valor
+
+lambda_min_fondo = max(fondo_valor - rango_fondo, 0)
+lambda_max_fondo = min(fondo_valor + rango_fondo, 255)
+
+print("lambda mínima (fondo): ", lambda_min_fondo)
+print("lambda máxima (fondo): ", lambda_max_fondo)
+
+# Binarización excluyendo el fondo
+binary_image = np.where(
+    (gray_image < lambda_min_fondo) | (gray_image > lambda_max_fondo), 1, 0).astype(np.uint8) * 255
+
+# Usamos np.nonzero para encontrar los píxeles que no son fondo (es decir, píxeles diferentes de 0)
+non_zero_pixels = np.nonzero(binary_image)
 
 # Obtenemos los datos de los extremos antes de ser rotados
 A, B, C, D = extremos(binary_image)
@@ -107,7 +248,7 @@ for col in range(B, D + 1):
         # Si no encontramos un píxel blanco, agregamos el valor de la altura total
         top_projection.append(cropped_image.shape[0])
     
-# PASO NUEVO: Crear el histograma de la proyección Left (de A a C)
+# Crear el histograma de la proyección Left (de A a C)
 left_projection = []
 
 # Recorremos de A a C para la proyección Left
@@ -121,7 +262,7 @@ for row in range(A, C + 1):
         # Si no encontramos un píxel blanco, agregamos el valor del ancho total
         left_projection.append(cropped_image.shape[1])
 
-# PASO NUEVO: Crear el histograma de la proyección Bottom (de B a D)
+# Crear el histograma de la proyección Bottom (de B a D)
 bottom_projection = []
 
 # Recorremos de B a D para la proyección Bottom
@@ -135,7 +276,7 @@ for col in range(B, D + 1):
         # Si no encontramos un píxel blanco, agregamos el valor de 0 (ningún píxel blanco encontrado)
         bottom_projection.append(0)
 
-# PASO NUEVO: Crear el histograma de la proyección Bottom (de B a D)
+# Crear el histograma de la proyección Bottom (de B a D)
 right_projection = []
 
 # Recorremos de A a C para la proyección Bottom
@@ -149,9 +290,9 @@ for row in range(A, C + 1):
         # Si no encontramos un píxel blanco, agregamos el valor de 0 (ningún píxel blanco encontrado)
         right_projection.append(0)
 
-# Paso 8: Mostrar el histograma que excluye el fondo
+# Mostrar el histograma que excluye el fondo
 plt.figure()
-plt.title("Histograma de Píxeles (excluyendo fondo blanco)")
+plt.title("Histograma de Píxeles")
 plt.xlabel("Valor de Intensidad")
 plt.ylabel("Número de píxeles")
 plt.xlim([0, 255])  # Solo queremos ver los valores de 0 a 255
@@ -198,6 +339,35 @@ plt.xlabel("Puntos del contorno")
 plt.ylabel("Distancia al borde")
 plt.grid(True)
 plt.show()
+
+# k: indice de coeficiente DCT a calcular
+k = 3
+
+# Coeficientes DCT
+dct_coeffs = [calcular_dctk(perfil_continuo, k) for k in range(len(perfil_continuo))]  
+
+# Reconstruir todo el perfil automáticamente
+perfil_reconstruido = reconstruir_perfil_completo(dct_coeffs)
+
+# Mostrar el perfil reconstruido
+#print("Perfil reconstruido:", perfil_reconstruido)
+
+plt.figure(figsize=(12, 6))
+plt.plot(perfil_continuo, label="Perfil Original", color="blue")
+plt.plot(perfil_reconstruido, label="Perfil Reconstruido", linestyle="--", color="red")
+plt.title("Comparación del Perfil Original y Reconstruido")
+plt.xlabel("Índice")
+plt.ylabel("Valor")
+plt.legend()
+plt.show()
+
+# Calcula el error EDCT entre el perfil original y el reconstruido.
+edct = calcular_edct(perfil_continuo, perfil_reconstruido)
+#print(f"Error EDCT: {edct}")
+
+# Realizar AVP Matching
+planta_detectada = avp_matching(perfil_reconstruido, resultados_path, k=3)
+print(f"La planta más probable es: {planta_detectada}")
 
 cv2.waitKey(0)
 cv2.destroyAllWindows()
