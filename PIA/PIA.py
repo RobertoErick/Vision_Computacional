@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import csv
 
 # -------------------------------------Seccion Recortes de imagen------------------------------------------- #
 
@@ -90,43 +91,58 @@ def normalizar_longitud(perfil, longitud_deseada=1500):
 def calcular_distancia_euclidiana(perfil1, perfil2):
     return np.sqrt(np.sum((np.array(perfil1) - np.array(perfil2))**2))
 
-# Muestra un diagrama de dispersión para las distancias más cercanas.
-def mostrar_diagrama_dispersion(distancias, k, nombre_hoja_prediccion="Hoja a Predecir"):
-    # distancias: Lista de tuplas (distancia, planta) ordenadas de menor a mayor
-    # k: Número de vecinos más cercanos a mostrar.
+# Guarda las mejores distancias por planta en un archivo .csv.
+def guardar_mejores_distancias_csv(distancias, archivo_csv="mejores_distancias.csv"):
+    # distancias: Lista de tuplas (distancia, planta).
+    # archivo_csv: Nombre del archivo .csv donde se guardarán los datos.
 
-    # Seleccionar los k vecinos más cercanos
-    mejores_k = distancias[:k]
-    
-    # Separar las distancias, índices, y etiquetas de plantas
-    indices = list(range(1, k + 1))  # Índices del 1 al k
-    distancias_valores = [item[0] for item in mejores_k]
-    plantas = [item[1] for item in mejores_k]
+    # Agrupar por planta y obtener la distancia mínima para cada planta
+    mejores_distancias = {}
+    for distancia, planta in distancias:
+        if planta not in mejores_distancias or distancia < mejores_distancias[planta]:
+            mejores_distancias[planta] = distancia
 
-    # Crear el diagrama de dispersión
-    plt.figure(figsize=(10, 5))
-    scatter = plt.scatter(indices, distancias_valores, c=range(len(plantas)), cmap='viridis', s=100, edgecolor='k', alpha=0.7)
-    
-    # Agregar un punto especial para la "hoja a predecir"
-    plt.scatter(0, 0, color='red', s=150, edgecolor='black', label=nombre_hoja_prediccion)  # Punto rojo para destacar
+    # Guardar en un archivo CSV
+    with open(archivo_csv, mode="w", newline="", encoding="utf-8") as archivo:
+        escritor = csv.writer(archivo)
+        escritor.writerow(["Planta", "Mejor Distancia Euclidiana"])
+        for planta, distancia in mejores_distancias.items():
+            escritor.writerow([planta, distancia])
 
-    # Configuración de ejes y leyendas
-    plt.xlabel("Índice del Vecino")
+    print(f"Mejores distancias guardadas en el archivo: {archivo_csv}")
+
+def mostrar_mejores_distancias_por_planta(distancias):
+    """
+    Muestra un diagrama de barras con las mejores distancias para cada planta.
+
+    Args:
+        distancias (list): Lista de tuplas (distancia, planta).
+    """
+    # Agrupar por planta y obtener la distancia mínima para cada planta
+    mejores_distancias = {}
+    for distancia, planta in distancias:
+        if planta not in mejores_distancias or distancia < mejores_distancias[planta]:
+            mejores_distancias[planta] = distancia
+
+    # Separar nombres de plantas y sus distancias
+    plantas = list(mejores_distancias.keys())
+    distancias_minimas = list(mejores_distancias.values())
+
+    # Crear el gráfico de barras
+    plt.figure(figsize=(12, 6))
+    plt.bar(plantas, distancias_minimas, color='mediumpurple')
+    plt.xlabel("Planta")
     plt.ylabel("Distancia Euclidiana")
-    plt.title(f"Diagrama de Dispersión: Distancias de los {k} Vecinos Más Cercanos")
-    plt.colorbar(scatter, label="Etiqueta de Planta (Indexado)")
-    plt.legend(loc="upper left")
-    plt.grid(alpha=0.3)
+    plt.title("Mejores Distancias por Planta")
+    plt.xticks(rotation=45, ha='right')
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.tight_layout()
-
-    # Etiquetas de las plantas sobre los puntos
-    for i, planta in enumerate(plantas):
-        plt.text(indices[i], distancias_valores[i] + 0.01, planta, fontsize=9, ha='center')
-
     plt.show()
 
-# Realiza el AVP Matching utilizando k-NN y genera un diagrama de dispersión.
 def avp_matching(perfil_reconstruido, resultados_path, k=3, longitud_deseada=1500):
+    """
+    Realiza el AVP Matching utilizando k-NN y genera un gráfico de las mejores distancias por planta.
+    """
     perfil_nuevo_normalizado = normalizar_longitud(perfil_reconstruido, longitud_deseada)
 
     # Cargar los resultados almacenados
@@ -140,17 +156,87 @@ def avp_matching(perfil_reconstruido, resultados_path, k=3, longitud_deseada=150
             distancias.append((distancia, planta))
 
     distancias.sort(key=lambda x: x[0])
+
+    # Mostrar mejores distancias por planta
+    mostrar_mejores_distancias_por_planta(distancias)
+
+    # Seleccionar los k vecinos más cercanos
     vecinos = distancias[:k]
 
-    # Mostrar diagrama de dispersión con "hoja a predecir"
-    mostrar_diagrama_dispersion(distancias, k, nombre_hoja_prediccion="Hoja a Predecir")
-
+    # Contar la frecuencia de cada planta entre los vecinos
     conteo = {}
     for _, planta in vecinos:
         conteo[planta] = conteo.get(planta, 0) + 1
 
     planta_probable = max(conteo, key=conteo.get)
     return planta_probable
+
+# ---------------------------------------------------------------------------------------------------------- #
+# ----------------------------------------Seccion Valle Global------------------------------------------------- #
+
+def calcular_histograma(imagen):
+    # Calcula el histograma de la imagen en escala de grises
+    histograma, _ = np.histogram(imagen.ravel(), bins=256, range=(0, 256))
+    return histograma
+
+def calcular_grupo_varianza(histograma, total_pixeles):
+    # Cálculo de varianza entre los grupos 
+    suma_total = np.sum([i * histograma[i] for i in range(256)])
+    suma_b = 0
+    w_b = 0
+    varianza_max = 0
+    mejor_umbral = 0
+
+    for umbral in range(256):
+        w_b += histograma[umbral]
+        w_f = total_pixeles - w_b
+        if w_b == 0 or w_f == 0:
+            continue
+        
+        suma_b += umbral * histograma[umbral]
+        m_b = suma_b / w_b if w_b != 0 else 0
+        m_f = (suma_total - suma_b) / w_f if w_f != 0 else 0
+
+        varianza_entre_clases = w_b * w_f * (m_b - m_f) ** 2
+
+        if varianza_entre_clases > varianza_max:
+            varianza_max = varianza_entre_clases
+            mejor_umbral = umbral
+
+    return mejor_umbral
+
+def calcular_desviacion_estandar(imagen):
+    # Cálculo de la desviación estándar
+    return np.std(imagen)
+
+def encontrar_picos(histograma):
+    # Encontrar picos en el histograma (máximos locales)
+    picos = []
+    for i in range(1, len(histograma) - 1):
+        if histograma[i] > histograma[i - 1] and histograma[i] > histograma[i + 1]:
+            picos.append(i)
+    return picos
+
+def calcular_valle_global(imagen):
+    # Obtener el histograma
+    histograma = calcular_histograma(imagen)
+    total_pixeles = imagen.size
+    
+    # Calcular el umbral utilizando grupo varianza
+    mejor_umbral = calcular_grupo_varianza(histograma, total_pixeles)
+    
+    # Calcular la desviación estándar
+    desviacion_estandar = calcular_desviacion_estandar(imagen)
+
+    # Encontrar los picos del histograma
+    picos = encontrar_picos(histograma)
+    
+    return mejor_umbral, desviacion_estandar, picos
+
+def aplicar_umbral(imagen, umbral):
+    # Binarización con el umbral calculado
+    _, imagen_umbralizada = cv2.threshold(imagen, umbral, 255, cv2.THRESH_BINARY)
+    return imagen_umbralizada
 
 # ---------------------------------------------------------------------------------------------------------- #
 # ----------------------------------------Seccion Principal------------------------------------------------- #
@@ -161,32 +247,42 @@ if not resultados_path:
     raise ValueError("El diccionario está vacío. Verifica la ruta")
 
 # Cargar la imagen y verificar si se cargó correctamente
-image = cv2.imread('hoja_rotada2.jpg')  # Imagen a predecir
+image = cv2.imread('amabis.jpg')  # Imagen a predecir
 if image is None:
     raise FileNotFoundError("La imagen no se pudo cargar. Verifica la ruta.")
 
 # Convertir la imagen a escala de grises
 gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-# Calcular el histograma de la imagen en escala de grises
-histogram, bin_edges = np.histogram(gray_image, bins=256, range=(0, 255))
+imagen = (gray_image * 255).astype(np.uint8)  # Normalizar la imagen a valores de 0 a 255
 
-# Encontrar el valor dominante del fondo (el valor con más píxeles)
-fondo_valor = np.argmax(histogram)
-print("Valor dominante del fondo: ", fondo_valor)
+# Calcular el umbral, desviación estándar y los picos
+mejor_umbral, desviacion_estandar, picos = calcular_valle_global(imagen)
 
-# Definir un rango para calcular el fondo a travez de un pivote (como vecindarios) selecciona el fondo en el histograma y denota la hoja
-rango_fondo = 60  # Si el fondo es constante (segun el Dataset lo es) no habra problema con este valor
+# Aplicar el umbral a la imagen
+binary_image = aplicar_umbral(imagen, mejor_umbral)
 
-lambda_min_fondo = max(fondo_valor - rango_fondo, 0)
-lambda_max_fondo = min(fondo_valor + rango_fondo, 255)
+# Mostrar la imagen original y la imagen umbralizada
+plt.figure(figsize=(12, 6))
 
-print("lambda mínima (fondo): ", lambda_min_fondo)
-print("lambda máxima (fondo): ", lambda_max_fondo)
+plt.subplot(1, 3, 1)
+plt.imshow(image, cmap='gray')
+plt.title('Imagen original')
 
-# Binarización excluyendo el fondo
-binary_image = np.where(
-    (gray_image < lambda_min_fondo) | (gray_image > lambda_max_fondo), 1, 0).astype(np.uint8) * 255
+plt.subplot(1, 3, 2)
+plt.imshow(binary_image, cmap='gray')
+plt.title(f'Imagen umbralizada (Umbral: {mejor_umbral})')
+
+# Mostrar el histograma de la imagen
+plt.subplot(1, 3, 3)
+histograma = calcular_histograma(imagen)
+plt.plot(histograma, color='black')
+plt.title('Histograma')
+plt.xlabel('Intensidad de píxel')
+plt.ylabel('Frecuencia')
+
+plt.tight_layout()
+plt.show()
 
 # Usamos np.nonzero para encontrar los píxeles que no son fondo (es decir, píxeles diferentes de 0)
 non_zero_pixels = np.nonzero(binary_image)
@@ -289,15 +385,6 @@ for row in range(A, C + 1):
     else:
         # Si no encontramos un píxel blanco, agregamos el valor de 0 (ningún píxel blanco encontrado)
         right_projection.append(0)
-
-# Mostrar el histograma que excluye el fondo
-plt.figure()
-plt.title("Histograma de Píxeles")
-plt.xlabel("Valor de Intensidad")
-plt.ylabel("Número de píxeles")
-plt.xlim([0, 255])  # Solo queremos ver los valores de 0 a 255
-plt.plot(bin_edges[0:-1], histogram)  # Excluyendo el último valor para evitar desbordamientos
-plt.show()
 
 # Mostrar las imágenes
 cv2.imshow('Imagen Original', image)

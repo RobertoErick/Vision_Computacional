@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-# Función para detectar vecindarios
+# Función para detectar vecindarios en un rango de +50 y -50
 def detectar_vecindarios(image, rango=50):
     # Obtener las dimensiones de la imagen
     rows, cols = image.shape
@@ -57,28 +57,22 @@ else:
     # Mostrar cuántos vecindarios se encontraron
     print(f"Número de vecindarios encontrados: {len(vecindarios)}")
 
-    # Mostrar los píxeles borde de cada vecindario
-    #for i, borde in enumerate(bordes_vecindarios):
-        #print(f"Vecindario {i + 1} tiene {len(borde)} píxeles borde.")
-
-    # Para visualizar los vecindarios en la imagen (opcional)
+    # Para visualizar los vecindarios en la imagen
     output_image = np.zeros_like(imagen)
     for i, vecindario in enumerate(vecindarios):
         color_value = (255 - (i * 25)) % 256  # Asegurar que los valores estén entre 0 y 255
         for (r, c) in vecindario:
             output_image[r, c] = color_value  # Colorear cada vecindario de manera diferente
 
-    # Crear imagen binaria para los bordes
-    bordes_imagen = np.zeros_like(imagen)
-    # Marcar los píxeles de borde en la imagen binaria
-    for borde in bordes_vecindarios:
-        for (r, c) in borde:
-            bordes_imagen[r, c] = 255  # Borde en blanco
-
     cv2.imshow('Vecindarios', output_image)
-    cv2.imwrite('Vecindarios.png', output_image) 
-    cv2.imshow("Bordes de la imagen", bordes_imagen)
-    cv2.imwrite("Bordes de la imagen.png", bordes_imagen)   
+    cv2.imwrite('Vecindarios.png', output_image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
+    # Guardar la matriz de la imagen en escala de grises en un archivo CSV
+    np.savetxt('imagen_gris.csv', imagen, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'imagen.csv'.")
+
+    # Guardar la matriz de la imagen resultante en un archivo CSV
+    np.savetxt('imagen_resultante.csv', output_image, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'imagen_resultante.csv'.")

@@ -27,4 +27,4 @@ else:
     cv2.destroyAllWindows()
 
     # Guardar imagen
-    cv2.imread('Copia.png', imagen_Copia)
+    cv2.imwrite('Imagen copia.png', imagen_Copia)

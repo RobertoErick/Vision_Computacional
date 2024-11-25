@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # Lee la imagen
-imagen = cv2.imread("imagen de prueba.png")
+imagen = cv2.imread("imagen a color.png")
 if imagen is None:
     print("Error: No se pudo cargar la imagen. Asegúrate de que el archivo está en el directorio correcto.")
 else:
