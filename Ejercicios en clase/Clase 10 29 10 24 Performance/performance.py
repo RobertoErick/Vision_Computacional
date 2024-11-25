@@ -2,6 +2,166 @@ import cv2
 import numpy as np
 from sklearn.linear_model import RANSACRegressor
 
+def detectar_lineas_conectadas(bordes_restantes):
+    # Crear una copia para ir eliminando líneas una por una
+    bordes_temp = np.copy(bordes_restantes)
+    lineas_detectadas = []
+    
+    # Dimensiones de la imagen
+    rows, cols = bordes_temp.shape
+
+    # Función para seguir una línea conectada usando una búsqueda en profundidad (DFS)
+    def seguir_linea(x, y):
+        stack = [(x, y)]
+        linea_actual = np.zeros_like(bordes_temp)  # Imagen para la línea actual
+        while stack:
+            cx, cy = stack.pop()
+            if 0 <= cx < cols and 0 <= cy < rows and bordes_temp[cy, cx] == 255:
+                # Marcar el píxel en la imagen de la línea actual y en bordes_temp
+                linea_actual[cy, cx] = 255
+                bordes_temp[cy, cx] = 0
+                # Agregar píxeles vecinos (4 direcciones) a la pila
+                for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nx, ny = cx + dx, cy + dy
+                    stack.append((nx, ny))
+        return linea_actual
+
+    # Recorrer la imagen para encontrar cada línea
+    for y in range(rows):
+        for x in range(cols):
+            if bordes_temp[y, x] == 255:
+                linea_actual = seguir_linea(x, y)
+                lineas_detectadas.append(linea_actual)
+
+    return lineas_detectadas
+
+def verificar_centro_candidato(linea_detectada, centro_x, centro_y):
+    # Dimensiones de la imagen
+    rows, cols = linea_detectada.shape
+
+    # Definir las 8 direcciones de los píxeles
+    direcciones = [
+        (-1, 0), (1, 0), (0, -1), (0, 1),
+        (-1, -1), (-1, 1), (1, -1), (1, 1)
+    ]
+
+    # Contador de líneas que tocan un borde
+    contador_lineas_que_toquen_borde = 0
+
+    # Crear una copia de la imagen para dibujar las líneas de prueba
+    imagen_lineas = linea_detectada.copy()
+
+    # Verificar cada dirección y dibujar las líneas de prueba
+    for dx, dy in direcciones:
+        end_x, end_y = centro_x, centro_y
+
+        # Extender la línea en la dirección actual hasta encontrar un borde o salir de la imagen
+        while 0 <= end_x + dx < cols and 0 <= end_y + dy < rows:
+            end_x += dx
+            end_y += dy
+            if linea_detectada[end_y, end_x] == 255:  # Si encontramos un borde
+                contador_lineas_que_toquen_borde += 1
+                break
+
+    # Comprobar si al menos 3 líneas tocan un borde
+    return contador_lineas_que_toquen_borde >= 3
+
+def encontrar_centro_con_rango_de_busqueda(linea_detectada, intervalo=10, rango=20):
+    acumulador = np.zeros_like(linea_detectada, dtype=np.int32)
+    rows, cols = linea_detectada.shape
+
+    # Definir las 8 direcciones de los píxeles
+    direcciones = [
+        (-1, 0), (1, 0), (0, -1), (0, 1),
+        (-1, -1), (-1, 1), (1, -1), (1, 1)
+    ]
+
+    contador_pixeles = 0
+
+    for y in range(rows):
+        for x in range(cols):
+            if linea_detectada[y, x] == 255:
+                contador_pixeles += 1
+                if contador_pixeles % intervalo == 0:
+                    longitudes_lineas = []
+                    puntos_finales = []
+
+                    for dx, dy in direcciones:
+                        end_x, end_y = x, y
+                        longitud = 0
+                        while 0 <= end_x + dx < cols and 0 <= end_y + dy < rows:
+                            end_x += dx
+                            end_y += dy
+                            longitud += 1
+                            if linea_detectada[end_y, end_x] == 255:
+                                break
+
+                        longitudes_lineas.append(longitud)
+                        puntos_finales.append((end_x, end_y))
+
+                    max_longitud_idx = np.argmax(longitudes_lineas)
+                    end_x, end_y = puntos_finales[max_longitud_idx]
+
+                    mid_x = (x + end_x) // 2
+                    mid_y = (y + end_y) // 2
+
+                    acumulador[mid_y, mid_x] += 1
+
+    contador_vecindario = np.zeros_like(acumulador)
+    for y in range(rango, rows - rango):
+        for x in range(rango, cols - rango):
+            ventana = acumulador[y - rango:y + rango + 1, x - rango:x + rango + 1]
+            contador_vecindario[y, x] = np.sum(ventana)
+
+    centro_y, centro_x = np.unravel_index(np.argmax(contador_vecindario), contador_vecindario.shape)
+    max_votos = contador_vecindario[centro_y, centro_x]
+
+    # Crear una copia para la imagen de prueba de verificación
+    if verificar_centro_candidato(linea_detectada, centro_x, centro_y):
+        max_distancia = 0
+        for dx, dy in direcciones:
+            end_x, end_y = centro_x, centro_y
+            while 0 <= end_x + dx < cols and 0 <= end_y + dy < rows:
+                end_x += dx
+                end_y += dy
+                if linea_detectada[end_y, end_x] == 255:
+                    distancia = np.sqrt((end_x - centro_x) ** 2 + (end_y - centro_y) ** 2)
+                    if distancia > max_distancia:
+                        max_distancia = distancia
+                    break
+
+        if max_distancia > 0:
+            return (centro_x, centro_y), max_distancia
+    return None, None
+
+# Procesar todas las líneas en bordes_restantes y dibujar los círculos en la imagen final
+def procesar_todas_las_lineas(bordes_restantes, imagen_original):
+    lineas_detectadas = detectar_lineas_conectadas(bordes_restantes)
+    imagen_resultado = imagen_original.copy()  # Imagen final para todos los círculos
+    imagen_solo_circulos = np.zeros_like(bordes_restantes)  # Imagen final para solo los círculos
+    bordes_restantes_2 = bordes_restantes.copy()  # Bordes restantes despues de los circulos
+
+    for idx, linea in enumerate(lineas_detectadas):
+        print(f"Procesando línea {idx + 1}")
+        centro, radio = encontrar_centro_con_rango_de_busqueda(linea)
+        if centro:
+            print(f"Centro del círculo en línea {idx + 1}: {centro}")
+            print(f"Diámetro del círculo en línea {idx + 1}: {2 * radio}")
+            
+            # Dibujar el círculo detectado en la imagen de resultado
+            cv2.circle(imagen_resultado, centro, int(radio), (255, 0, 0), 2)
+            cv2.circle(imagen_resultado, centro, 2, (0, 0, 255), 3)
+
+            # Dibujar solo los círculos detectados en la imagen nueva
+            cv2.circle(imagen_solo_circulos, centro, int(radio), (255), 2)
+
+            # Borrar circulos de los bordes restantes
+            cv2.circle(bordes_restantes_2, centro, int(radio), (0), 2)
+        else:
+            print(f"No se encontró un círculo válido en línea {idx + 1}.")
+
+    return imagen_resultado, imagen_solo_circulos, bordes_restantes_2
+        
 # Función para aplicar RANSAC en múltiples iteraciones
 def detectar_varias_lineas_ransac(puntos_X, puntos_Y, min_puntos=5, max_iteraciones=50):
     lineas_ransac = []
@@ -69,7 +229,7 @@ def detectar_vecindarios(image, rango=50):
     return vecindarios, bordes_vecindarios
 
 # Cargar imagen en escala de grises
-imagen_a_color = cv2.imread('imagen 3.png')
+imagen_a_color = cv2.imread('imagen 4.png')
 if imagen_a_color is None:
     print("Error: No se pudo cargar la imagen.")
 else:
@@ -104,62 +264,61 @@ else:
     solo_lineas = np.zeros_like(bordes_imagen)
     bordes_restantes = np.copy(bordes_imagen)
 
-    """
-    if lineas is not None:
-    # Preparar las listas de puntos X e Y
-        puntos_X = []
-        puntos_Y = []
-
-        for linea in lineas:
-            for x1, y1, x2, y2 in linea:
-                puntos_X.append([x1])  # x como predictor
-                puntos_X.append([x2])
-                puntos_Y.append(y1)    # y como valor predicho
-                puntos_Y.append(y2)
-
-        # Convertir las listas a matrices numpy
-        puntos_X = np.array(puntos_X)
-        puntos_Y = np.array(puntos_Y)
-
-        # Detectar varias líneas con RANSAC
-        lineas_detectadas = detectar_varias_lineas_ransac(puntos_X, puntos_Y)
-
-        # Dibujar las líneas detectadas en la imagen
-        for linea in lineas_detectadas:
-            puntos_inliers_X, puntos_inliers_Y = linea
-            
-            # Encontrar los puntos extremos de los inliers
-            if len(puntos_inliers_X) > 1:  # Asegurar que haya al menos dos puntos para formar una línea
-                x_start, x_end = int(puntos_inliers_X.min()), int(puntos_inliers_X.max())
-                
-                # Obtener los valores de y correspondientes a los puntos extremos en x
-                y_start = int(puntos_inliers_Y[puntos_inliers_X.argmin()])
-                y_end = int(puntos_inliers_Y[puntos_inliers_X.argmax()])
-                
-                # Dibujar la línea entre los puntos extremos
-                cv2.line(imagen_a_color, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
-    """
     if lineas is not None:
         for linea in lineas:
             for x1, y1, x2, y2 in linea:
                 cv2.line(imagen_a_color, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Dibuja cada línea con color verde
                 cv2.line(solo_lineas, (x1, y1), (x2, y2), (255), 2)  # Dibuja cada línea con color verde
-                cv2.line(bordes_restantes, (x1, y1), (x2, y2), (0, 255, 0), 2)  # Quita las lineas rectas
+                cv2.line(bordes_restantes, (x1, y1), (x2, y2), (0), 2) # Quita las lineas rectas
 
-    np.savetxt('Lineas rectas.csv', solo_lineas, delimiter=',', fmt='%d')
-    np.savetxt('Bordes restantes.csv', bordes_restantes, delimiter=',', fmt='%d')
+    imagen_circulos, imagen_solo_circulos, bordes_restantes_2 = procesar_todas_las_lineas(bordes_imagen, imagen_a_color)
 
-    # Mostrar la imagen con las líneas detectadas
+    # Mostrar las imagenes procesadas
     cv2.imshow('Vecindarios', output_image)
     cv2.imshow("Bordes de la imagen", bordes_imagen)
     cv2.imshow('Lineas rectas sobrepuestas', imagen_a_color)
     cv2.imshow('Solo lineas rectas', solo_lineas)
     cv2.imshow("Bordes restantes de la imagen", bordes_restantes)
+    cv2.imshow("Circulos detectados", imagen_circulos)
+    cv2.imshow("Solo circulos", imagen_solo_circulos)
+    cv2.imshow("Bordes restnantes despues de circulos", bordes_restantes_2)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-    cv2.imwrite('Vecindarios.png', output_image)
-    cv2.imwrite("Bordes de la imagen.png", bordes_imagen)
-    cv2.imwrite('Lineas rectas sobrepuestas.png', imagen_a_color)
-    cv2.imwrite('Solo lineas rectas.png', solo_lineas)
-    cv2.imwrite("Bordes restantes de la imagen.png", bordes_restantes)
+    # Guardar las imagenes procesadas
+    cv2.imwrite('Imagen Vecindarios.png', output_image)
+    cv2.imwrite("Imagen Bordes de la imagen.png", bordes_imagen)
+    cv2.imwrite('Imagen Lineas rectas sobrepuestas.png', imagen_a_color)
+    cv2.imwrite('Imagen Solo lineas rectas.png', solo_lineas)
+    cv2.imwrite("Imagen Bordes restantes de la imagen.png", bordes_restantes)
+    cv2.imwrite("Imagen Circulos detectados.png", imagen_circulos)
+    cv2.imwrite("Imagen Solo circulos.png", imagen_solo_circulos)
+    cv2.imwrite("Imagen Bordes restantes despues de circulos.png", bordes_restantes_2)
+
+    # Guardar la matriz de la imagen en escala de grises en un archivo CSV
+    np.savetxt('Matriz imagen_gris.csv', imagen, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz imagen_gris.csv'.")
+
+    # Guardar la matriz de la imagen vecindarios en un archivo CSV
+    np.savetxt('Matriz Vecindarios.csv', output_image, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Vecindarios.csv'.")
+
+    # Guardar la matriz de la imagen Bordes de la imagen en un archivo CSV
+    np.savetxt('Matriz Bordes de la imagen.csv', bordes_imagen, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Bordes de la imagen.csv'.")
+
+    # Guardar la matriz de la imagen Solo lineas rectas en un archivo CSV
+    np.savetxt('Matriz Solo lineas rectas.csv', solo_lineas, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Solo lineas rectas.csv'.")
+
+    # Guardar la matriz de la imagen Bordes restantes de la imagen en un archivo CSV
+    np.savetxt('Matriz Bordes restantes de la imagen.csv', bordes_restantes, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Bordes restantes de la imagen.csv'.")
+    
+    # Guardar la matriz de la imagen Bordes restantes de la imagen en un archivo CSV
+    np.savetxt('Matriz imagen solo circulos.csv', imagen_solo_circulos, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Bordes restantes de la imagen.csv'.")
+
+    # Guardar la matriz de la imagen Bordes restantes de la imagen en un archivo CSV
+    np.savetxt('Matriz Bordes restantes despues de circulos.csv', bordes_restantes_2, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Bordes restantes despues de circulos.csv'.")
