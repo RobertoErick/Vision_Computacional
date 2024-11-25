@@ -83,48 +83,6 @@ plt.show()
 # Guardar la imagen resultante
 cv2.imwrite('Imagen poligonos detectados.png', imagen_con_poligonos)
 
-# Detectar agujeros
-imagen_con_resultados = image.copy()
-solo_agujeros = np.zeros_like(gray_image)
-agujeros = 0
-
-for poligono in poligonos:
-    # Crear una máscara para el polígono
-    mask = np.zeros_like(gray_image, dtype=np.uint8)
-    cv2.drawContours(mask, [poligono], -1, 255, thickness=cv2.FILLED)
-
-    # Extraer intensidades dentro del polígono
-    intensidades = gray_image[mask == 255]
-    promedio = np.mean(intensidades)
-
-    # Crear máscara para agujeros basados en la diferencia de intensidad
-    lower_bound = promedio - 50
-    upper_bound = promedio + 50
-    mask_agujeros = ((gray_image < lower_bound) | (gray_image > upper_bound)) & (mask == 255)
-
-    # Detectar contornos de los agujeros
-    contornos, _ = cv2.findContours(mask_agujeros.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    for contorno in contornos:
-        # Dibujar el agujero en rojo
-        cv2.drawContours(imagen_con_resultados, [contorno], -1, (0, 0, 255), 2)
-        cv2.drawContours(solo_agujeros, [contorno], -1, (255), 2)
-        agujeros += 1
-
-    # Dibujar el polígono en verde
-    cv2.drawContours(imagen_con_resultados, [poligono], -1, (0, 255, 0), 2)
-
-cv2.imshow('Imagen poligonos y agujeros', solo_agujeros)
-# Mostrar la imagen con polígonos y agujeros detectados
-plt.figure(figsize=(10, 5))
-plt.imshow(cv2.cvtColor(imagen_con_resultados, cv2.COLOR_BGR2RGB))
-plt.title(f'Polígonos: {len(poligonos)}, Agujeros: {agujeros}')
-plt.axis('off')
-plt.show()
-
-# Guardar la imagen resultante
-cv2.imwrite('Imagen poligonos y agujeros.png', imagen_con_resultados)
-
 # Guardar la matriz de la imagen en escala de grises en un archivo CSV
 np.savetxt('Matriz Solo esquinas.csv', solo_esquinas, delimiter=',', fmt='%d')
 print("La matriz de la imagen binarizada se ha guardado en 'Matriz Solo esquinas.csv'.")
@@ -132,7 +90,3 @@ print("La matriz de la imagen binarizada se ha guardado en 'Matriz Solo esquinas
 # Guardar la matriz de la imagen en escala de grises en un archivo CSV
 np.savetxt('Matriz Solo poligonos.csv', solo_poligonos, delimiter=',', fmt='%d')
 print("La matriz de la imagen binarizada se ha guardado en 'Matriz Solo poligonos.csv'.")
-
-# Guardar la matriz de la imagen en escala de grises en un archivo CSV
-np.savetxt('Matriz Solo agujeros.csv', solo_agujeros, delimiter=',', fmt='%d')
-print("La matriz de la imagen binarizada se ha guardado en 'Matriz Solo agujeros.csv'.")
