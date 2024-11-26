@@ -271,7 +271,29 @@ else:
                 cv2.line(solo_lineas, (x1, y1), (x2, y2), (255), 2)  # Dibuja cada línea con color verde
                 cv2.line(bordes_restantes, (x1, y1), (x2, y2), (0), 2) # Quita las lineas rectas
 
+    # Funcion para obtener los circulos en la imagen ylos bordes que restan
     imagen_circulos, imagen_solo_circulos, bordes_restantes_2 = procesar_todas_las_lineas(bordes_imagen, imagen_a_color)
+
+    # Detectar contornos en la imagen para la elipse
+    contornos, _ = cv2.findContours(bordes_restantes_2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Crear una copia para visualizar el resultado en la imagen original y la sola
+    imagen_elipses_sobrepuestos = imagen_circulos.copy()
+    imagen_elipses = np.zeros_like(imagen)
+
+    # Lista para guardar las elipses detectadas
+    elipses_detectadas = []
+
+    # Procesar cada contorno
+    for contorno in contornos:
+        if len(contorno) >= 160:  # Necesitamos al menos 10 puntos para ajustar una elipse
+            # Ajustar una elipse al contorno
+            elipse = cv2.fitEllipse(contorno)
+            elipses_detectadas.append(elipse)
+            # Dibujar las elipses en la imagen original
+            cv2.ellipse(imagen_elipses_sobrepuestos, elipse, (121, 84, 183), 2)
+            # Dibujar las elipses una imagen nueva
+            cv2.ellipse(imagen_elipses, elipse, (255), 2)
 
     # Mostrar las imagenes procesadas
     cv2.imshow('Vecindarios', output_image)
@@ -282,6 +304,8 @@ else:
     cv2.imshow("Circulos detectados", imagen_circulos)
     cv2.imshow("Solo circulos", imagen_solo_circulos)
     cv2.imshow("Bordes restnantes despues de circulos", bordes_restantes_2)
+    cv2.imshow("Elipses", imagen_elipses_sobrepuestos)
+    cv2.imshow("Solo elipses", imagen_elipses)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -294,6 +318,8 @@ else:
     cv2.imwrite("Imagen Circulos detectados.png", imagen_circulos)
     cv2.imwrite("Imagen Solo circulos.png", imagen_solo_circulos)
     cv2.imwrite("Imagen Bordes restantes despues de circulos.png", bordes_restantes_2)
+    cv2.imwrite("Imagen Elipses.png", imagen_elipses_sobrepuestos)
+    cv2.imwrite("Imagen Solo elipses.png", imagen_elipses)
 
     # Guardar la matriz de la imagen en escala de grises en un archivo CSV
     np.savetxt('Matriz imagen_gris.csv', imagen, delimiter=',', fmt='%d')
@@ -322,3 +348,7 @@ else:
     # Guardar la matriz de la imagen Bordes restantes de la imagen en un archivo CSV
     np.savetxt('Matriz Bordes restantes despues de circulos.csv', bordes_restantes_2, delimiter=',', fmt='%d')
     print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Bordes restantes despues de circulos.csv'.")
+
+    # Guardar la matriz de la imagen Bordes restantes de la imagen en un archivo CSV
+    np.savetxt('Matriz Solo elipses.csv', imagen_elipses, delimiter=',', fmt='%d')
+    print("La matriz de la imagen en escala de grises se ha guardado en 'Matriz Solo elipses.csv'.")
